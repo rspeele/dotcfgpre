@@ -1,6 +1,8 @@
 module Compiler where
 import HighLevel
 import LowLevel
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as B
 import Data.Map (Map)
 import qualified Data.Map as M
 import Control.Monad.State
@@ -15,19 +17,18 @@ import Control.Monad.State
 -- alias 1 "x 0"
 -- 1
 
-type ByteString = String
 type AliasName = ByteString
 type AliasId = Int
 
 data ExportAlias
     = ExportAlias
-      { aliasCode :: RawCode
-      , aliasExtra :: RawCode
+      { aliasCode :: [RawStatement]
+      , aliasExtra :: [RawStatement]
       } deriving (Show, Read, Eq)
 
 data Compilation
     = Compilation
-      { genAliases :: Map AliasId RawCode
+      { genAliases :: Map AliasId [RawStatement]
       , expAliases :: Map AliasName ExportAlias
       } deriving (Show, Read, Eq)
 
@@ -44,12 +45,12 @@ nextAliasId m
     | otherwise = 1 + (fst $ M.findMax m)
 
 nameAliasId :: AliasId -> AliasName
-nameAliasId id = concat [":", show id]
+nameAliasId id = B.pack $ concat [":", show id]
 
 invokeAliasId :: AliasId -> RawStatement
 invokeAliasId id = RawStatement (nameAliasId id) []
 
-generateAlias :: RawCode -> State Compilation AliasId
+generateAlias :: [RawStatement] -> State Compilation AliasId
 generateAlias code = do
   st <- get
   let oldMap = genAliases st
@@ -58,7 +59,7 @@ generateAlias code = do
   put $ st { genAliases = newMap }
   return newId
 
-exportAlias :: AliasName -> RawCode -> State Compilation ()
+exportAlias :: AliasName -> [RawStatement] -> State Compilation ()
 exportAlias name code = do
   st <- get
   let oldMap = expAliases st
