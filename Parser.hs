@@ -16,6 +16,9 @@ bmany = bpack many
 bmany1 = bpack many1
 bmanyTill p end = manyTill p end >>= return . B.pack
 
+anyOf :: [Parser a] -> Parser a
+anyOf = foldr1 (<|>) . map try
+
 identifier :: Parser ByteString
 identifier =
     bmany1 $ satisfy (`S.member` idc)
@@ -43,22 +46,29 @@ block :: Parser [Statement]
 block = char '[' *> statements <* char ']'
 
 terminator :: Parser ()
-terminator = oneOf ";\r\n" *> return () <|> eof
-terminators :: Parser ()
+terminator = oneOf ";\r\n" *> return ()
+             <?> "terminator"
 
-terminators = terminator <* ignoredSpace
+terminators :: Parser ()
+terminators = many requiredSpace *> terminator <* ignoredSpace
+              <?> "terminators"
 
 ignoredSpace :: Parser ()
-ignoredSpace = many (terminator <|> requiredSpace) *> return ()
+ignoredSpace = eof <|> many (terminator <|> requiredSpace) *> return ()
+               <?> "whitespace"
 
 statement :: Parser Statement
 statement =
-    try (Raw <$> rawStatement)
-    <|> (Block <$> block)
-
-wrap x = between x x
+    anyOf
+    [ Block <$> block
+    , Raw <$> rawStatement
+    ]
 
 statements :: Parser [Statement]
-statements = ignoredSpace *> many (statement <* terminators) <* ignoredSpace
+statements = ignoredSpace *> try statement `sepBy` (try terminators) <* ignoredSpace
 
 test s = parse statement "" (B.pack s)
+tests s = parse statements "" (B.pack s)
+
+parseStatements :: ByteString -> Either ParseError [Statement]
+parseStatements s = parse statements "" s
