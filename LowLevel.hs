@@ -22,6 +22,6 @@ assembleOne (RawStatement sym args)
 assembleMany stmts
         = joinBy '\n' $ map assembleOne stmts
 
-alias :: ByteString -> ByteString -> RawStatement
-alias name value = RawStatement "alias" [name, value]
+-- alias :: ByteString -> ByteString -> RawStatement
+-- alias name value = RawStatement "alias" [name, value]
 

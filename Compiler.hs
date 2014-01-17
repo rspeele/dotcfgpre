@@ -7,17 +7,6 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Control.Monad.State
 
--- Ok, so what does our compiler have to keep track of?
--- Sometimes, we have to generate extra aliases in order to nest code
--- For if statements, we have to generate an alias for each branch, an alias for the current branch, and aliases for switching the current branch
--- We also have to stick code onto the thing that triggers the condition to run the branch-switching aliases
-
--- [ x [ y z ] ]
--- alias 0 "y z"
--- alias 1 "x 0"
--- 1
-
-type AliasName = ByteString
 type AliasId = Int
 
 data ExportAlias
@@ -78,8 +67,10 @@ compileCode ss = mapM compileStatement ss >>= return . concat
 compileStatement :: Statement -> State Compilation [RawStatement]
 compileStatement s =
     case s of
-      Raw r -> compileRaw r
-      Block b -> compileBlock b
+      Raw raw -> compileRaw raw
+      Block block -> compileBlock block
+      Alias name body -> compileAlias name body
+      Bind key stmt -> compileBind key stmt
 
 compileRaw :: RawStatement -> State Compilation [RawStatement]
 compileRaw = return . (: [])
@@ -90,7 +81,16 @@ compileBlock block = do
   aliasId <- generateAlias compiled
   return $ [invokeAliasId aliasId]
 
+compileAlias :: AliasName -> Statement -> State Compilation [RawStatement]
+compileAlias name body = do
+  code <- compileStatement body
+  name <- exportAlias name code
+  return []
+
+compileBind :: KeyName -> Statement -> State Compilation [RawStatement]
+compileBind key body = undefined
+
 compile :: [Statement] -> ([RawStatement], Compilation)
 compile ss = runState (compileCode ss) emptyCompilation
 
--- compile [Block [Raw $ RawStatement "hello" ["world"], Block [Raw $ RawStatement "nested" []]]]
+

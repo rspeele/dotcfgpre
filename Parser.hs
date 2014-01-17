@@ -15,6 +15,7 @@ bmany :: Parser Char -> Parser ByteString
 bmany = bpack many
 bmany1 = bpack many1
 bmanyTill p end = manyTill p end >>= return . B.pack
+bstring s = string s >>= return . B.pack
 
 anyOf :: [Parser a] -> Parser a
 anyOf = foldr1 (<|>) . map try
@@ -29,22 +30,6 @@ identifier =
                 ,"_"
                 ]
 
-requiredSpace :: Parser ()
-requiredSpace = many1 (satisfy (`elem` " \t")) *> return ()
-
-quotedArgument :: Parser ByteString
-quotedArgument = char '"' *> bmanyTill anyChar (char '"')
-
-argument :: Parser ByteString
-argument = quotedArgument <|> identifier
-
-rawStatement :: Parser RawStatement
-rawStatement =
-    RawStatement <$> identifier <*> many (try $ requiredSpace >> argument)
-
-block :: Parser [Statement]
-block = char '[' *> statements <* char ']'
-
 terminator :: Parser ()
 terminator = oneOf ";\r\n" *> return ()
              <?> "terminator"
@@ -57,18 +42,56 @@ ignoredSpace :: Parser ()
 ignoredSpace = eof <|> many (terminator <|> requiredSpace) *> return ()
                <?> "whitespace"
 
+requiredSpace :: Parser ()
+requiredSpace = many1 (satisfy (`elem` " \t")) *> return ()
+
+quotedArgument :: Parser ByteString
+quotedArgument = char '"' *> bmanyTill anyChar (char '"')
+
+argument :: Parser ByteString
+argument = quotedArgument <|> identifier
+
+raw :: Parser Statement
+raw = Raw <$> raw'
+    where
+      raw' = RawStatement <$> identifier <*> args
+      args = many $ try $ requiredSpace *> argument
+
+block :: Parser Statement
+block = Block <$> (char '[' *> statements <* char ']')
+
+alias :: Parser Statement
+alias = Alias <$> n <*> st
+    where
+      n = bstring "alias" *> requiredSpace *> identifier
+      st = requiredSpace *> statement
+
+bind :: Parser Statement
+bind = Bind <$> k <*> st
+    where
+      k = bstring "bind" *> requiredSpace *> quotedArgument
+      st = requiredSpace *> statement
+
 statement :: Parser Statement
 statement =
     anyOf
-    [ Block <$> block
-    , Raw <$> rawStatement
+    [ block
+    , alias
+    , bind
+    , raw
     ]
 
 statements :: Parser [Statement]
-statements = ignoredSpace *> try statement `sepBy` (try terminators) <* ignoredSpace
-
-test s = parse statement "" (B.pack s)
-tests s = parse statements "" (B.pack s)
+statements = ignoredSpace *> body <* ignoredSpace
+    where
+      body = do
+        first <- optionMaybe statement
+        case first of
+          Just stmt ->
+              do
+                rest <- many $ try $ terminators *> statement
+                return $ stmt : rest
+          Nothing -> return []
 
 parseStatements :: ByteString -> Either ParseError [Statement]
 parseStatements s = parse statements "" s
