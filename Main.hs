@@ -3,6 +3,7 @@ import Parser
 import HighLevel
 import LowLevel
 import Compiler
+import Compilation
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 
@@ -14,6 +15,6 @@ main = do
     Left error -> print error
     Right parsed ->
         do
-          print parsed
-          let compiled = compile parsed
-          print compiled
+          let (code, cmp) = compile parsed
+              assy = assemble code cmp
+          B.putStr assy

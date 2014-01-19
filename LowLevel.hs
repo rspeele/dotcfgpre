@@ -5,23 +5,28 @@ import Data.List (intersperse)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 
-joinBy :: Char -> [String] -> String
-joinBy c = concat . intersperse [c]
+joinBy :: Char -> [ByteString] -> ByteString
+joinBy c bs  = B.concat $ intersperse (B.singleton c) bs
 
-wrapWith :: Char -> String -> String
-wrapWith c s = c : s ++ [c]
+wrapWith :: Char -> ByteString -> ByteString
+wrapWith c s = B.concat [B.singleton c, s, B.singleton c]
 
 data RawStatement
     = RawStatement ByteString [ByteString]
       deriving (Show, Read, Eq)
 
-assembleOne (RawStatement sym args)
-    = joinBy ' ' $ (B.unpack sym) : map (wrapWith '"' . B.unpack) args
+rawTopLevel :: RawStatement -> ByteString
+rawTopLevel (RawStatement sym args)
+    = joinBy ' ' $ sym : map (wrapWith '"') args
 
+rawsTopLevel :: [RawStatement] -> ByteString
+rawsTopLevel = joinBy '\n' . map rawTopLevel
 
-assembleMany stmts
-        = joinBy '\n' $ map assembleOne stmts
+rawInQuotes :: RawStatement -> ByteString
+rawInQuotes (RawStatement sym args)
+    = joinBy ' ' $ sym : args
 
--- alias :: ByteString -> ByteString -> RawStatement
--- alias name value = RawStatement "alias" [name, value]
+rawsInQuotes :: [RawStatement] -> ByteString
+rawsInQuotes = joinBy ';' . map rawInQuotes
+
 

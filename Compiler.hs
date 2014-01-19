@@ -1,4 +1,5 @@
 module Compiler where
+import Compilation
 import HighLevel
 import LowLevel
 import Data.ByteString.Char8 (ByteString)
@@ -6,60 +7,6 @@ import qualified Data.ByteString.Char8 as B
 import Data.Map (Map)
 import qualified Data.Map as M
 import Control.Monad.State
-
-type AliasId = Int
-
-data ExportAlias
-    = ExportAlias
-      { aliasCode :: [RawStatement]
-      , aliasExtra :: [RawStatement]
-      } deriving (Show, Read, Eq)
-
-data Compilation
-    = Compilation
-      { genAliases :: Map AliasId [RawStatement]
-      , expAliases :: Map AliasName ExportAlias
-      } deriving (Show, Read, Eq)
-
-emptyCompilation :: Compilation
-emptyCompilation =
-    Compilation
-    { genAliases = M.empty
-    , expAliases = M.empty
-    }
-
-nextAliasId :: Map AliasId a -> AliasId
-nextAliasId m
-    | M.null m = 0
-    | otherwise = 1 + (fst $ M.findMax m)
-
-nameAliasId :: AliasId -> AliasName
-nameAliasId id = B.pack $ concat [":", show id]
-
-invokeAliasId :: AliasId -> RawStatement
-invokeAliasId id = RawStatement (nameAliasId id) []
-
-generateAlias :: [RawStatement] -> State Compilation AliasId
-generateAlias code = do
-  st <- get
-  let oldMap = genAliases st
-      newId = nextAliasId oldMap
-      newMap = M.insert newId code oldMap
-  put $ st { genAliases = newMap }
-  return newId
-
-exportAlias :: AliasName -> [RawStatement] -> State Compilation ()
-exportAlias name code = do
-  st <- get
-  let oldMap = expAliases st
-      alias = ExportAlias { aliasCode = code, aliasExtra = [] }
-      rcode new old =
-          ExportAlias
-          { aliasCode = aliasCode new
-          , aliasExtra = aliasExtra new ++ aliasExtra old
-          }
-      newMap = M.insertWith rcode name alias oldMap
-  put $ st { expAliases = newMap }
 
 compileCode :: [Statement] -> State Compilation [RawStatement]
 compileCode ss = mapM compileStatement ss >>= return . concat
@@ -84,8 +31,32 @@ compileBlock block = do
 compileAlias :: AliasName -> Statement -> State Compilation [RawStatement]
 compileAlias name body = do
   code <- compileStatement body
-  name <- exportAlias name code
+  name <- exportAlias name code -- TODO: what if this is a dynamic re-aliasing?
   return []
+-- Shouldn't this get an alias name to perform the
+-- re-aliasing, which it then invokes? Maybe not, because
+-- it might not be possible to do the re-aliasing through
+-- an alias. Actually, it is. When you run exportAlias x
+-- "say hello", you should really get three things:
+-- 1. :0 is genAlias "say hello"
+-- 2. Put x into expAlises as ":0"
+-- 3. Make a genAlias "alias x :0"
+-- 4. Invoke that genAlias as code.
+-- So what if "alias x" shows up a lot? What is the end state of the expalias?
+-- It will work out OK, because the last top-level statement should always win.
+-- And that is what will happen, since the last top-level statement
+-- will in fact invoke its own assignment.
+-- But wait!
+-- That's not entirely true...
+-- All of the extraCode in the expAlias, generated from things
+-- like "if *x", needs to apply for *any* value of x's alias assignment.
+-- One approach would be to put that code in all the genAliases made
+-- in the step 1. above. But that would be gratuitous and hard to
+-- guarantee. So maybe the right flow is to use one more proxy genAlias
+-- which will represent x's current code assignement.
+-- The output should look like:
+-- alias x "xextra1;xextra2;proxy_x"
+-- The [RawStatement] spit out for a compileAlias would actually be a re-alias of proxy_x.
 
 compileBind :: KeyName -> Statement -> State Compilation [RawStatement]
 compileBind key body = undefined
