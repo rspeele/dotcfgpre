@@ -61,3 +61,12 @@ mustParse alias "alias x say hello"
 mustParse alias "alias x [say hello]"
               $ Alias "x" $ Block [(Raw $ RawStatement "say" ["hello"])]
 
+mustParse ifStmt "if +x [say hello] else say goodbye"
+              $ If (Plus "x")
+                    (Block [Raw $ RawStatement "say" ["hello"]])
+                    (Just $ Raw $ RawStatement "say" ["goodbye"])
+
+mustParse ifStmt "if -x say hello and stuff"
+              $ If (Minus "x")
+                    (Raw $ RawStatement "say" ["hello", "and", "stuff"])
+                    Nothing

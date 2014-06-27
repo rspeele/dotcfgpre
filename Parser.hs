@@ -72,12 +72,24 @@ bind = Bind <$> k <*> st
       k = bstring "bind" *> requiredSpace *> identifier
       st = requiredSpace *> statement
 
+ifStmt :: Parser Statement
+ifStmt = If <$> ifPart <*> (requiredSpace *> statement) <*> optionMaybe elsePart
+    where
+      ifPart = bstring "if" *> requiredSpace *> condPart
+      condPart =
+          anyOf
+          [ Plus <$> (bstring "+" *> identifier)
+          , Minus <$> (bstring "-" *> identifier)
+          ]
+      elsePart = requiredSpace *> bstring "else" *> requiredSpace *> statement
+
 statement :: Parser Statement
 statement =
     anyOf
     [ block
     , alias
     , bind
+    , ifStmt
     , raw
     ]
 
