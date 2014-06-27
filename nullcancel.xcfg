@@ -1,0 +1,28 @@
+alias +mleft [
+ if +mright -mright
+ +left
+]
+alias -mleft -left
+
+alias +mright [
+ if +mleft -mleft
+ +right
+]
+alias -mright -right
+
+alias +mfwd [
+ if +mback -mback
+ +forward
+]
+alias -mfwd -forward
+
+alias +mback [
+ if +mfwd -mfwd
+ +back
+]
+alias -mback -back
+
+bind d +mfwd
+bind s +mback
+bind a +mleft
+bind f +mright

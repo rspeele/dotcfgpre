@@ -78,8 +78,8 @@ ifStmt = If <$> ifPart <*> (requiredSpace *> statement) <*> optionMaybe elsePart
       ifPart = bstring "if" *> requiredSpace *> condPart
       condPart =
           anyOf
-          [ Plus <$> (bstring "+" *> identifier)
-          , Minus <$> (bstring "-" *> identifier)
+          [ pressed <$> (bstring "+" *> identifier)
+          , released <$> (bstring "-" *> identifier)
           ]
       elsePart = requiredSpace *> bstring "else" *> requiredSpace *> statement
 

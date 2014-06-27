@@ -6,10 +6,13 @@ import qualified Data.ByteString.Char8 as B
 type KeyName = ByteString
 type AliasName = ByteString
 
-data Condition
-    = Plus AliasName
-    | Minus AliasName
-      deriving (Show, Read, Eq)
+data Condition = Condition Bool AliasName deriving (Show, Read, Eq)
+
+pressed = Condition True
+released = Condition False
+
+oppositeCondition :: Condition -> Condition
+oppositeCondition (Condition b a) = Condition (not b) a
 
 data Statement
     = Raw RawStatement

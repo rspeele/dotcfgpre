@@ -16,3 +16,4 @@ bind w [
      y
 ]
 
+if +z [ do stuff ] else [ do other stuff ]

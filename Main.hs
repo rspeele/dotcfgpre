@@ -18,7 +18,7 @@ assemble code cmp =
 
 main :: IO ()
 main = do
-  contents <- B.readFile "input.txt"
+  contents <- B.readFile "nullcancel.xcfg"
   let parseResult = parseStatements contents
   case parseResult of
     Left error -> print error

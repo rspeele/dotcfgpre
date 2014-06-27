@@ -4,10 +4,13 @@ module Alias
     , AliasId
     , emptyAliasMap
     , generateAlias
+    , generateDynamicAlias
+    , assignDynamicAliasId
     , assignAlias
-    , addAliasHook
+    , addAliasHookPair
     , nameAliasId
     , invokeAliasId
+    , invokeDynamicAliasId
     , aliasMapCode
     ) where
 import HighLevel
@@ -20,6 +23,8 @@ import Control.Monad.State
 
 type AliasId = Int
 
+newtype DynamicAliasId = DynamicAliasId AliasId deriving (Show, Read, Eq, Ord)
+
 data ExportAlias =
     ExportAlias
     { exportName :: AliasName
@@ -30,6 +35,7 @@ data AliasMap =
     AliasMap
     { internals :: Map [RawStatement] AliasId
     , exports :: Map AliasName ExportAlias
+    , dynamics :: Map DynamicAliasId AliasId
     , maxAliasId :: Int
     }
 
@@ -37,6 +43,7 @@ emptyAliasMap =
     AliasMap
     { internals = M.empty
     , exports = M.empty
+    , dynamics = M.empty
     , maxAliasId = 0
     }
 
@@ -52,6 +59,9 @@ nameAliasProxy export = B.concat ["_", exportName export]
 invokeAliasId :: AliasId -> RawStatement
 invokeAliasId id = RawStatement (nameAliasId id) []
 
+invokeDynamicAliasId :: DynamicAliasId -> RawStatement
+invokeDynamicAliasId (DynamicAliasId id) = invokeAliasId id
+
 -- | Creates/gets the alias ID for the given code.
 generateAlias :: [RawStatement] -> State AliasMap AliasId
 generateAlias code = do
@@ -66,6 +76,16 @@ generateAlias code = do
                , maxAliasId = newId }
       return newId
 
+-- | Creates an alias ID which will be set to the given alias by default, but may be
+-- dynamically reassigned during script execution.
+generateDynamicAlias :: AliasId -> State AliasMap DynamicAliasId
+generateDynamicAlias staticId = do
+  st <- get
+  let id = nextAliasId st
+      dyn = DynamicAliasId id
+  put $ st { maxAliasId = id, dynamics = M.insert dyn staticId $ dynamics st }
+  return dyn
+
 -- | Creates/gets the export alias for the given alias name.
 exportAlias :: AliasName -> State AliasMap ExportAlias
 exportAlias name = do
@@ -78,6 +98,15 @@ exportAlias name = do
       put $ st { exports = M.insert name newEx $ exports st }
       return newEx
         where newEx = ExportAlias { exportName = name, exportHooks = [] }
+
+assignAliasId :: AliasId -> [RawStatement] -> RawStatement
+assignAliasId id code =
+    RawStatement "alias" [nameAliasId id, rawsInQuotes code]
+
+-- | Generates a statement that will reassign a dynamic alias.
+assignDynamicAliasId :: DynamicAliasId -> AliasId -> RawStatement
+assignDynamicAliasId (DynamicAliasId id) staticId =
+    RawStatement "alias" [nameAliasId id, rawInQuotes $ invokeAliasId staticId]
 
 -- | Returns a raw statement that will change the main definition of
 -- the given name to the given code.
@@ -98,6 +127,11 @@ addAliasHook name hook = do
   put $ st { exports = M.insert name newEx $ exports st }
   return ()
 
+addAliasHookPair :: AliasName -> [RawStatement] -> [RawStatement] -> State AliasMap ()
+addAliasHookPair name pressed released = do
+  addAliasHook (B.cons '+' name) pressed
+  addAliasHook (B.cons '-' name) released
+
 exportAliasCode :: AliasMap -> [RawStatement]
 exportAliasCode amap =
     [ RawStatement "alias" [name, rawsInQuotes $ proxy : hooks]
@@ -113,10 +147,16 @@ exportAliasCode amap =
 
 internalAliasCode :: AliasMap -> [RawStatement]
 internalAliasCode amap =
-    [ RawStatement "alias" [nameAliasId id, rawsInQuotes code]
+    [ assignAliasId id code
      | (code, id) <- M.toList $ internals amap ]
+
+dynamicAliasCode :: AliasMap -> [RawStatement]
+dynamicAliasCode amap =
+    [ assignDynamicAliasId id staticId
+      | (id, staticId) <- M.toList $ dynamics amap ]
+
 
 -- | Get the raw code that the alias map requires for exported aliases to function.
 aliasMapCode :: AliasMap -> [RawStatement]
-aliasMapCode map = exportAliasCode map ++ internalAliasCode map
+aliasMapCode amap = concat [dynamicAliasCode amap, exportAliasCode amap, internalAliasCode amap]
 
