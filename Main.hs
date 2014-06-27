@@ -9,7 +9,12 @@ import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 
 assemble :: [RawStatement] -> AliasMap -> ByteString
-assemble code cmp = B.concat [rawsTopLevel code, "\n\n\n", rawsTopLevel $ aliasMapCode cmp]
+assemble code cmp =
+    B.concat
+         [ rawsTopLevel $ aliasMapCode cmp
+         , "\n\n\n"
+         , rawsTopLevel code
+         ]
 
 main :: IO ()
 main = do

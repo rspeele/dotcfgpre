@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module LowLevel where
 import Data.List (intersperse)
 import Data.ByteString.Char8 (ByteString)

@@ -7,6 +7,12 @@ x
 
 say welcome
 
+say hello
 +forward
 +back
+
+bind w [
+     +forward
+     y
+]
 

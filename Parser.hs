@@ -27,7 +27,7 @@ identifier =
                 [['a'..'z']
                 ,['A'..'Z']
                 ,['0'..'9']
-                ,"_"
+                ,"_+-"
                 ]
 
 terminator :: Parser ()
@@ -69,7 +69,7 @@ alias = Alias <$> n <*> st
 bind :: Parser Statement
 bind = Bind <$> k <*> st
     where
-      k = bstring "bind" *> requiredSpace *> quotedArgument
+      k = bstring "bind" *> requiredSpace *> identifier
       st = requiredSpace *> statement
 
 statement :: Parser Statement

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Compiler
     ( compileCode
     , compileStatement
@@ -41,7 +42,9 @@ compileAlias name body = do
   return [assignmentCode]
 
 compileBind :: KeyName -> Statement -> State Compilation [RawStatement]
-compileBind key body = undefined
+compileBind key body = do
+  code <- compileStatement body
+  return [RawStatement "bind" [ key, rawsInQuotes code ]]
 
 compile :: [Statement] -> ([RawStatement], Compilation)
 compile ss = runState (compileCode ss) emptyAliasMap

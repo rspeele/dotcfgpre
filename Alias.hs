@@ -6,6 +6,7 @@ module Alias
     , generateAlias
     , assignAlias
     , addAliasHook
+    , nameAliasId
     , invokeAliasId
     , aliasMapCode
     ) where
@@ -43,10 +44,10 @@ nextAliasId :: AliasMap -> AliasId
 nextAliasId = (+ 1) . maxAliasId
 
 nameAliasId :: AliasId -> AliasName
-nameAliasId id = B.concat [":", B.pack $ show id]
+nameAliasId id = B.concat ["_", B.pack $ show id]
 
 nameAliasProxy :: ExportAlias -> AliasName
-nameAliasProxy export = B.concat [":", exportName export]
+nameAliasProxy export = B.concat ["_", exportName export]
 
 invokeAliasId :: AliasId -> RawStatement
 invokeAliasId id = RawStatement (nameAliasId id) []
