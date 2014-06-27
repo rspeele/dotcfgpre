@@ -134,16 +134,19 @@ addAliasHookPair name pressed released = do
 
 exportAliasCode :: AliasMap -> [RawStatement]
 exportAliasCode amap =
-    [ RawStatement "alias" [name, rawsInQuotes $ proxy : hooks]
-      | (name, proxy, hooks) <- infos ]
+    concat
+    [ [ RawStatement "alias" [name, rawsInQuotes $ proxy : hooks ]
+      , RawStatement "alias" [proxyName, rawsInQuotes []] ]
+      | (name, proxyName, proxy, hooks) <- infos ]
         where
           exps = M.toList $ exports amap
           infos = map (getInf . snd) exps
           getInf exp =
               ( exportName exp
-              , RawStatement (nameAliasProxy exp) []
+              , proxyName
+              , RawStatement proxyName []
               , exportHooks exp
-              )
+              ) where proxyName = nameAliasProxy exp
 
 internalAliasCode :: AliasMap -> [RawStatement]
 internalAliasCode amap =
@@ -158,5 +161,10 @@ dynamicAliasCode amap =
 
 -- | Get the raw code that the alias map requires for exported aliases to function.
 aliasMapCode :: AliasMap -> [RawStatement]
-aliasMapCode amap = concat [dynamicAliasCode amap, exportAliasCode amap, internalAliasCode amap]
+aliasMapCode amap =
+    concat
+    [ dynamicAliasCode amap
+    , exportAliasCode amap
+    , internalAliasCode amap
+    ]
 
