@@ -1,0 +1,71 @@
++thing = stuff
+-thing = other stuff
+
+a = blah; if *thing then stuff1 else stuff2
+
+
+------------------------------------------------------------
+
+alias __if0_on "stuff1"
+alias __if0_off "stuff2"
+alias __if0 "__if0_off"
+
+alias +thing "stuff;alias __if0 __if0_on"
+alias -thing "other stuff;alias __if0 __if0_off"
+
+alias a "blah; __if0"
+
+------------------------------------------------------------
+
++foo = fooOn
+-foo = fooOff
+
++bar = barOn
+-bar = barOff
+
++baz = bazOn
+-baz = bazOff
+
+a = blah; if *foo && *bar && *baz then stuff1 else stuff2
+
+------------------------------------------------------------
+
+alias if0_when_on "stuff1"
+alias if0_when_off "stuff2"
+alias if0 if0_when_off
+
+alias if0_turn_on "alias if0 if0_when_on"
+alias if0_turn_off "alias if0 if0_when_off"
+
+alias if0_add if0_add0
+alias if0_sub if0_sub0
+
+// add steps
+// add0: alias add add1; alias sub sub0
+// add1: alias add add2; alias sub sub1
+// add2: turn on; alias sub sub2
+
+// sub steps
+// sub2: turn off; alias sub sub1
+// sub1: alias add add1; alias sub sub0;
+// sub0: alias add add0
+
+alias if0_add0 "alias if0_add if0_add1 ; alias if0_sub if0_sub0"
+alias if0_add1 "alias if0_add if0_add2 ; alias if0_sub if0_sub1"
+alias if0_add2 "if0_turn_on            ; alias if0_sub if0_sub2"
+
+alias if0_sub2 "if0_turn_off           ; alias if0_sub if0_sub1"
+alias if0_sub1 "alias if0_add if0_add1 ; alias if0_sub if0_sub0"
+alias if0_sub0 "alias if0_add if0_add0                         "
+
+alias +foo "fooOn;if0_add"
+alias -foo "fooOff;if0_sub"
+
+alias +bar "barOn;if0_add"
+alias -bar "barOff;if0_sub"
+
+alias +baz "bazOn;if0_add"
+alias -baz "bazOn;if0_sub"
+
+alias a "blah; __if0"
+

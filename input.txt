@@ -1,0 +1,12 @@
+alias x [
+      say hello
+      alias y [ say goodbye ]
+]
+
+x
+
+say welcome
+
++forward
++back
+

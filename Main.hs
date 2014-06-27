@@ -1,11 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Parser
 import HighLevel
 import LowLevel
 import Compiler
-import Compilation
+import Alias
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
+
+assemble :: [RawStatement] -> AliasMap -> ByteString
+assemble code cmp = B.concat [rawsTopLevel code, "\n\n\n", rawsTopLevel $ aliasMapCode cmp]
 
 main :: IO ()
 main = do
@@ -17,4 +21,4 @@ main = do
         do
           let (code, cmp) = compile parsed
               assy = assemble code cmp
-          B.putStr assy
+          B.putStrLn assy

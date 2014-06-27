@@ -13,7 +13,7 @@ wrapWith c s = B.concat [B.singleton c, s, B.singleton c]
 
 data RawStatement
     = RawStatement ByteString [ByteString]
-      deriving (Show, Read, Eq)
+      deriving (Show, Read, Eq, Ord)
 
 rawTopLevel :: RawStatement -> ByteString
 rawTopLevel (RawStatement sym args)
