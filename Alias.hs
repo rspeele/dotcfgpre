@@ -13,8 +13,8 @@ module Alias
     , invokeDynamicAliasId
     , aliasMapCode
     ) where
-import HighLevel
-import LowLevel
+import Language
+import RawCfg
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Map (Map)
@@ -28,12 +28,12 @@ newtype DynamicAliasId = DynamicAliasId AliasId deriving (Show, Read, Eq, Ord)
 data ExportAlias =
     ExportAlias
     { exportName :: AliasName
-    , exportHooks :: [RawStatement]
+    , exportHooks :: [RawStmt]
     }
 
 data AliasMap =
     AliasMap
-    { internals :: Map [RawStatement] AliasId
+    { internals :: Map [RawStmt] AliasId
     , exports :: Map AliasName ExportAlias
     , dynamics :: Map DynamicAliasId AliasId
     , maxAliasId :: Int
@@ -56,14 +56,14 @@ nameAliasId id = B.concat ["_", B.pack $ show id]
 nameAliasProxy :: ExportAlias -> AliasName
 nameAliasProxy export = B.concat ["_", exportName export]
 
-invokeAliasId :: AliasId -> RawStatement
-invokeAliasId id = RawStatement (nameAliasId id) []
+invokeAliasId :: AliasId -> RawStmt
+invokeAliasId id = RawStmt (nameAliasId id) []
 
-invokeDynamicAliasId :: DynamicAliasId -> RawStatement
+invokeDynamicAliasId :: DynamicAliasId -> RawStmt
 invokeDynamicAliasId (DynamicAliasId id) = invokeAliasId id
 
 -- | Creates/gets the alias ID for the given code.
-generateAlias :: [RawStatement] -> State AliasMap AliasId
+generateAlias :: [RawStmt] -> State AliasMap AliasId
 generateAlias code = do
   st <- get
   let existing = M.lookup code $ internals st
@@ -99,26 +99,26 @@ exportAlias name = do
       return newEx
         where newEx = ExportAlias { exportName = name, exportHooks = [] }
 
-assignAliasId :: AliasId -> [RawStatement] -> RawStatement
+assignAliasId :: AliasId -> [RawStmt] -> RawStmt
 assignAliasId id code =
-    RawStatement "alias" [nameAliasId id, rawsInQuotes code]
+    RawStmt "alias" [nameAliasId id, rawsInQuotes code]
 
 -- | Generates a statement that will reassign a dynamic alias.
-assignDynamicAliasId :: DynamicAliasId -> AliasId -> RawStatement
+assignDynamicAliasId :: DynamicAliasId -> AliasId -> RawStmt
 assignDynamicAliasId (DynamicAliasId id) staticId =
-    RawStatement "alias" [nameAliasId id, rawInQuotes $ invokeAliasId staticId]
+    RawStmt "alias" [nameAliasId id, rawInQuotes $ invokeAliasId staticId]
 
 -- | Returns a raw statement that will change the main definition of
 -- the given name to the given code.
-assignAlias :: AliasName -> [RawStatement] -> State AliasMap RawStatement
+assignAlias :: AliasName -> [RawStmt] -> State AliasMap RawStmt
 assignAlias name code = do
   codeId <- generateAlias code
   export <- exportAlias name
-  return $ RawStatement "alias" [nameAliasProxy export, nameAliasId codeId]
+  return $ RawStmt "alias" [nameAliasProxy export, nameAliasId codeId]
 
 -- | Add code to run whenever the given alias name is executed,
 -- regardless of what it has been dynamically reassigned to.
-addAliasHook :: AliasName -> [RawStatement] -> State AliasMap ()
+addAliasHook :: AliasName -> [RawStmt] -> State AliasMap ()
 addAliasHook name hook = do
   export <- exportAlias name
   hookId <- generateAlias hook
@@ -127,16 +127,16 @@ addAliasHook name hook = do
   put $ st { exports = M.insert name newEx $ exports st }
   return ()
 
-addAliasHookPair :: AliasName -> [RawStatement] -> [RawStatement] -> State AliasMap ()
+addAliasHookPair :: AliasName -> [RawStmt] -> [RawStmt] -> State AliasMap ()
 addAliasHookPair name pressed released = do
   addAliasHook (B.cons '+' name) pressed
   addAliasHook (B.cons '-' name) released
 
-exportAliasCode :: AliasMap -> [RawStatement]
+exportAliasCode :: AliasMap -> [RawStmt]
 exportAliasCode amap =
     concat
-    [ [ RawStatement "alias" [name, rawsInQuotes $ proxy : hooks ]
-      , RawStatement "alias" [proxyName, rawsInQuotes []] ]
+    [ [ RawStmt "alias" [name, rawsInQuotes $ proxy : hooks ]
+      , RawStmt "alias" [proxyName, rawsInQuotes []] ]
       | (name, proxyName, proxy, hooks) <- infos ]
         where
           exps = M.toList $ exports amap
@@ -144,23 +144,23 @@ exportAliasCode amap =
           getInf exp =
               ( exportName exp
               , proxyName
-              , RawStatement proxyName []
+              , RawStmt proxyName []
               , exportHooks exp
               ) where proxyName = nameAliasProxy exp
 
-internalAliasCode :: AliasMap -> [RawStatement]
+internalAliasCode :: AliasMap -> [RawStmt]
 internalAliasCode amap =
     [ assignAliasId id code
      | (code, id) <- M.toList $ internals amap ]
 
-dynamicAliasCode :: AliasMap -> [RawStatement]
+dynamicAliasCode :: AliasMap -> [RawStmt]
 dynamicAliasCode amap =
     [ assignDynamicAliasId id staticId
       | (id, staticId) <- M.toList $ dynamics amap ]
 
 
 -- | Get the raw code that the alias map requires for exported aliases to function.
-aliasMapCode :: AliasMap -> [RawStatement]
+aliasMapCode :: AliasMap -> [RawStmt]
 aliasMapCode amap =
     concat
     [ dynamicAliasCode amap

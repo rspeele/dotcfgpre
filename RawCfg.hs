@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module LowLevel where
+module RawCfg where
 import Data.List (intersperse)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -10,22 +10,22 @@ joinBy c bs  = B.concat $ intersperse (B.singleton c) bs
 wrapWith :: Char -> ByteString -> ByteString
 wrapWith c s = B.concat [B.singleton c, s, B.singleton c]
 
-data RawStatement
-    = RawStatement ByteString [ByteString]
+data RawStmt
+    = RawStmt ByteString [ByteString]
       deriving (Show, Read, Eq, Ord)
 
-rawTopLevel :: RawStatement -> ByteString
-rawTopLevel (RawStatement sym args)
+rawTopLevel :: RawStmt -> ByteString
+rawTopLevel (RawStmt sym args)
     = joinBy ' ' $ sym : map (wrapWith '"') args
 
-rawsTopLevel :: [RawStatement] -> ByteString
+rawsTopLevel :: [RawStmt] -> ByteString
 rawsTopLevel = joinBy '\n' . map rawTopLevel
 
-rawInQuotes :: RawStatement -> ByteString
-rawInQuotes (RawStatement sym args)
+rawInQuotes :: RawStmt -> ByteString
+rawInQuotes (RawStmt sym args)
     = joinBy ' ' $ sym : args
 
-rawsInQuotes :: [RawStatement] -> ByteString
+rawsInQuotes :: [RawStmt] -> ByteString
 rawsInQuotes = joinBy ';' . map rawInQuotes
 
 

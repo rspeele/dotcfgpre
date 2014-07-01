@@ -1,6 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Parser where
-import LowLevel
-import HighLevel
+import Language
+import RawCfg
 import Control.Applicative
 import Data.Char (isSpace)
 import Data.ByteString.Char8 (ByteString)
@@ -8,6 +9,7 @@ import qualified Data.ByteString.Char8 as B
 import Data.Set (Set)
 import qualified Data.Set as S
 import Text.Parsec.ByteString
+import Text.Parsec.Expr
 import Text.Parsec hiding ((<|>), many)
 
 bpack m f = m f >>= return . B.pack
@@ -51,59 +53,69 @@ quotedArgument = char '"' *> bmanyTill anyChar (char '"')
 argument :: Parser ByteString
 argument = quotedArgument <|> identifier
 
-raw :: Parser Statement
-raw = Raw <$> raw'
+raw :: Parser SmartStmt
+raw = DirectStmt <$> raw'
     where
-      raw' = RawStatement <$> identifier <*> args
+      raw' = RawStmt <$> identifier <*> args
       args = many $ try $ requiredSpace *> argument
 
-block :: Parser Statement
-block = Block <$> (char '[' *> statements <* char ']')
+block :: Parser SmartStmt
+block = BlockStmt <$> (char '[' *> statements <* char ']')
 
-alias :: Parser Statement
-alias = Alias <$> n <*> st
+alias :: Parser SmartStmt
+alias = AliasStmt <$> n <*> st
     where
       n = bstring "alias" *> requiredSpace *> identifier
-      st = requiredSpace *> statement
+      st = requiredSpace *> smartSt
 
-bind :: Parser Statement
-bind = Bind <$> k <*> st
+bind :: Parser SmartStmt
+bind = BindStmt <$> k <*> st
     where
       k = bstring "bind" *> requiredSpace *> identifier
-      st = requiredSpace *> statement
+      st = requiredSpace *> smartSt
 
-ifStmt :: Parser Statement
-ifStmt = If <$> ifPart <*> (requiredSpace *> statement) <*> optionMaybe elsePart
+condition :: Parser Condition
+condition = buildExpressionParser table (term <* ignoredSpace)
     where
-      ifPart = bstring "if" *> requiredSpace *> condPart
-      condPart =
+      term = parens <|> check
+      parens = char '(' *> ignoredSpace *> condition <* char ')'
+      check =
           anyOf
-          [ pressed <$> (bstring "+" *> identifier)
-          , released <$> (bstring "-" *> identifier)
-          ]
-      elsePart = requiredSpace *> bstring "else" *> requiredSpace *> statement
+          [ Check <$> (char '+' *> identifier)
+          , Not . Check <$> (char '-' *> identifier) ]
+      table = [ [ binary "and" And ]
+              , [ binary "or" Or ] ]
+      binary name fun = Infix (bstring name <* ignoredSpace *> return fun) AssocLeft
 
-statement :: Parser Statement
-statement =
+smartSt :: Parser SmartStmt
+smartSt =
     anyOf
-    [ block
+    [ ifSt
+    , block
     , alias
     , bind
-    , ifStmt
     , raw
     ]
 
-statements :: Parser [Statement]
+ifSt :: Parser SmartStmt
+ifSt = IfStmt <$> ifPart <*> thenPart <*> elsePart
+    where
+      ifPart = bstring "if" *> requiredSpace *> condition
+      thenPart = bstring "then" *> requiredSpace *> smartSt
+      elsePart = requiredSpace *> bstring "else" *> requiredSpace *> smartSt
+                 <|> (return $ BlockStmt [])
+
+statements :: Parser [SmartStmt]
 statements = ignoredSpace *> body <* ignoredSpace
     where
       body = do
-        first <- optionMaybe statement
+        first <- optionMaybe smartSt
         case first of
           Just stmt ->
               do
-                rest <- many $ try $ terminators *> statement
+                rest <- many $ try $ terminators *> smartSt
                 return $ stmt : rest
           Nothing -> return []
 
-parseStatements :: ByteString -> Either ParseError [Statement]
-parseStatements s = parse statements "" s
+parseStmts :: ByteString -> Either ParseError [SmartStmt]
+parseStmts s = parse statements "" s

@@ -3,14 +3,14 @@
 module ParserGuarantees where
 import Guarantee
 import Parser
-import LowLevel
-import HighLevel
+import RawCfg
+import Language
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Text.Parsec.ByteString
 import Text.Parsec hiding ((<|>), many)
 
-mustParse raw "say hello" $ Raw (RawStatement "say" ["hello"])
+mustParse raw "say hello" $ DirectStmt (RawStmt "say" ["hello"])
 
 mustParse identifier "ab77D_92" "ab77D_92"
 
@@ -43,30 +43,40 @@ mustParse statements "" []
 mustParse statements "\r\n   \t\n;;;" []
 
 mustParse statements "say hello; say goodbye      "
-              $ [Raw $ RawStatement "say" ["hello"], Raw $ RawStatement "say" ["goodbye"]]
+              $ [DirectStmt $ RawStmt "say" ["hello"], DirectStmt $ RawStmt "say" ["goodbye"]]
 
-mustNotParse block "" $ Block []
+mustNotParse block "" $ BlockStmt []
 
-mustParse block "[]" $ Block []
+mustParse block "[]" $ BlockStmt []
 
 mustParse block "[say hello; say goodbye]"
-              $ Block [Raw $ RawStatement "say" ["hello"], Raw $ RawStatement "say" ["goodbye"]]
+              $ BlockStmt [DirectStmt $ RawStmt "say" ["hello"], DirectStmt $ RawStmt "say" ["goodbye"]]
 
 mustParse block "[say  hello  \n\n\n     say goodbye  ]"
-              $ Block [Raw $ RawStatement "say" ["hello"], Raw $ RawStatement "say" ["goodbye"]]
+              $ BlockStmt [DirectStmt $ RawStmt "say" ["hello"], DirectStmt $ RawStmt "say" ["goodbye"]]
 
 mustParse alias "alias x say hello"
-              $ Alias "x" (Raw $ RawStatement "say" ["hello"])
+              $ AliasStmt "x" (DirectStmt $ RawStmt "say" ["hello"])
 
 mustParse alias "alias x [say hello]"
-              $ Alias "x" $ Block [(Raw $ RawStatement "say" ["hello"])]
+              $ AliasStmt "x" $ BlockStmt [(DirectStmt $ RawStmt "say" ["hello"])]
 
-mustParse ifStmt "if +x [say hello] else say goodbye"
-              $ If (Plus "x")
-                    (Block [Raw $ RawStatement "say" ["hello"]])
-                    (Just $ Raw $ RawStatement "say" ["goodbye"])
+mustParse condition "+x" (Check "x")
+mustParse condition "(+y)" (Check "y")
+mustParse condition "( +y  )" (Check "y")
+mustParse condition "+x or +y" (Or (Check "x") (Check "y"))
 
-mustParse ifStmt "if -x say hello and stuff"
-              $ If (Minus "x")
-                    (Raw $ RawStatement "say" ["hello", "and", "stuff"])
-                    Nothing
+mustParse ifSt "if +x then [say hello] else say goodbye"
+              $ IfStmt (Check "x")
+                    (BlockStmt [DirectStmt $ RawStmt "say" ["hello"]])
+                    (DirectStmt $ RawStmt "say" ["goodbye"])
+
+mustParse ifSt "if -x or +y then say hello and stuff"
+              $ IfStmt ((Not $ Check "x") `Or` (Check "y"))
+                    (DirectStmt $ RawStmt "say" ["hello", "and", "stuff"])
+                    (BlockStmt [])
+
+mustParse ifSt "if -x then say hello and stuff"
+              $ IfStmt (Not $ Check "x")
+                    (DirectStmt $ RawStmt "say" ["hello", "and", "stuff"])
+                    (BlockStmt [])

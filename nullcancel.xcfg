@@ -1,25 +1,25 @@
 alias +mleft [
- if +mright [
+ if +mright then [
   -mright
   +wasright
  ]
  +moveleft
 ]
 alias -mleft [
- if +wasright +mright
+ if +wasright then +mright
  -wasleft
  -moveleft
 ]
 
 alias +mright [
- if +mleft [
+ if +mleft then [
   -mleft
   +wasleft
  ]
  +moveright
 ]
 alias -mright [
- if +wasleft +mleft
+ if +wasleft then +mleft
  -wasright
  -moveright
 ]
