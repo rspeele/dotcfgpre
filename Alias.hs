@@ -19,6 +19,7 @@ import Control.Monad.State
 data ExportAlias =
     ExportAlias
     { exportName :: AliasName
+    , exportProxy :: DynamicAlias
     , exportHooks :: [Instruction]
     }
 
@@ -40,9 +41,6 @@ emptyAliasMap =
 
 nextAliasId :: AliasMap -> Int
 nextAliasId = (+ 1) . maxAliasId
-
-nameAliasProxy :: ExportAlias -> AliasName
-nameAliasProxy export = B.concat ["_", exportName export]
 
 -- | Creates/gets the alias ID for the given code.
 generateAlias :: [Instruction] -> State AliasMap StaticAlias
@@ -78,19 +76,14 @@ exportAlias name = do
   case existing of
     Just e -> return e
     Nothing -> do
-      proxy <- generateAlias []
+      proxy <- generateAlias [] >>= generateDynamicAlias
+      let newEx =
+              ExportAlias
+              { exportName = name
+              , exportProxy = proxy
+              , exportHooks = [] }
       put $ st { exports = M.insert name newEx $ exports st }
       return newEx
-        where newEx = ExportAlias { exportName = name, exportHooks = [] }
-
--- assignAliasId :: StaticAlias -> [Instruction] -> Instruction
--- assignAliasId id code = undefined
--- --    RawStmt "alias" [nameAliasId id, rawsInQuotes code]
-
--- -- | Generates a statement that will reassign a dynamic alias.
--- assignDynamicAliasId :: DynamicAlias -> StaticAlias -> Instruction
--- assignDynamicAliasId (DynamicAlias id) staticId = undefined
--- --    RawStmt "alias" [nameAliasId id, rawInQuotes $ invokeAliasId staticId]
 
 -- | Returns a raw statement that will change the main definition of
 -- the given name to the given code.
@@ -98,7 +91,7 @@ assignAlias :: AliasName -> [Instruction] -> State AliasMap Instruction
 assignAlias name code = do
   codeId <- generateAlias code
   export <- exportAlias name
-  return $ AssignName (nameAliasProxy export) $ [InvokeStatic codeId]
+  return $ AssignDynamic (exportProxy export) $ InvokeStatic codeId
 
 -- | Add code to run whenever the given alias name is executed,
 -- regardless of what it has been dynamically reassigned to.
@@ -118,19 +111,16 @@ addAliasHookPair name pressed released = do
 
 exportAliasCode :: AliasMap -> [Instruction]
 exportAliasCode amap =
-    concat
-    [ [ AssignName name (proxy : hooks)
-      , AssignName proxyName [] ]
-      | (name, proxyName, proxy, hooks) <- infos ]
+    [ AssignName name (proxy : hooks)
+      | (name, proxy, hooks) <- infos ]
         where
           exps = M.toList $ exports amap
           infos = map (getInf . snd) exps
           getInf exp =
               ( exportName exp
-              , proxyName
-              , InvokeRaw proxyName []
+              , InvokeDynamic $ exportProxy exp
               , exportHooks exp
-              ) where proxyName = nameAliasProxy exp
+              )
 
 internalAliasCode :: AliasMap -> [Instruction]
 internalAliasCode amap =
@@ -141,7 +131,6 @@ dynamicAliasCode :: AliasMap -> [Instruction]
 dynamicAliasCode amap =
     [ AssignDynamic id $ InvokeStatic staticId
       | (id, staticId) <- M.toList $ dynamics amap ]
-
 
 -- | Get the raw code that the alias map requires for exported aliases to function.
 aliasMapCode :: AliasMap -> [Instruction]
