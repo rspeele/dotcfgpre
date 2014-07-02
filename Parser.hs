@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Parser where
 import Language
-import RawCfg
 import Control.Applicative
-import Data.Char (isSpace)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Set (Set)
@@ -54,9 +52,8 @@ argument :: Parser ByteString
 argument = quotedArgument <|> identifier
 
 raw :: Parser SmartStmt
-raw = DirectStmt <$> raw'
+raw = DirectStmt <$> identifier <*> args
     where
-      raw' = RawStmt <$> identifier <*> args
       args = many $ try $ requiredSpace *> argument
 
 block :: Parser SmartStmt

@@ -1,10 +1,5 @@
 module Language where
-import RawCfg
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-
-type KeyName = ByteString
-type AliasName = ByteString
+import CoreTypes
 
 data Condition
     = Check AliasName
@@ -20,7 +15,7 @@ oppositeCondition :: Condition -> Condition
 oppositeCondition c = Not c
 
 data SmartStmt
-    = DirectStmt RawStmt
+    = DirectStmt ByteString [ByteString]
     | IfStmt Condition SmartStmt SmartStmt
     | BlockStmt [SmartStmt]
     | BindStmt KeyName SmartStmt

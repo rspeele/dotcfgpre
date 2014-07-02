@@ -6,7 +6,7 @@ alias +mleft [
  +moveleft
 ]
 alias -mleft [
- if +wasright then +mright
+ if +wasright then +mright;
  -wasleft
  -moveleft
 ]
@@ -19,7 +19,7 @@ alias +mright [
  +moveright
 ]
 alias -mright [
- if +wasleft then +mleft
+ if +wasleft then +mleft;
  -wasright
  -moveright
 ]

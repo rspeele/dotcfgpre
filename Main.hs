@@ -4,26 +4,26 @@ import Language
 import Parser
 import Compiler
 import Alias
-import RawCfg
+import Instruction
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 
-assemble :: [RawStmt] -> AliasMap -> ByteString
-assemble code cmp =
+build :: [Instruction] -> AliasMap -> ByteString
+build code cmp =
     B.concat
-         [ rawsTopLevel $ aliasMapCode cmp
+         [ assembleMany $ aliasMapCode cmp
          , "\n\n\n"
-         , rawsTopLevel code
+         , assembleMany code
          ]
 
 main :: IO ()
 main = do
-  contents <- B.readFile "conditions.xcfg"
+  contents <- B.readFile "nullcancel.xcfg"
   let parseResult = parseStmts contents
   case parseResult of
     Left error -> print error
     Right parsed ->
         do
           let (code, cmp) = compile parsed
-              assy = assemble code cmp
-          B.putStrLn assy
+              built = build code cmp
+          B.putStrLn built
