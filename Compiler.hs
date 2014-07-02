@@ -51,6 +51,7 @@ compileSimple s =
       IfCheck name pos neg -> compileIf name pos neg
 
 compileBlock :: [SimpleStmt] -> State AliasMap [Instruction]
+compileBlock [s] = compileSimple s
 compileBlock block = do
   compiled <- compileSimpleCode block
   aliasId <- generateAlias compiled
